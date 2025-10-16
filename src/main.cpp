@@ -48,11 +48,20 @@ int main(void){
  * CS0[2:0] = 0b100 (1/256 prescale)
  * OCIE0A = 1 (enable interrupt on OCR0A match)
  */
-void setup_timer0(void) {
-        TCCR0A |= (1<<WGM01);
-        TCCR0B |= (1<<CS02);
-        OCR0A = 70;
-        TCNT0 = 0;
-        TIMSK0 |= (1<<OCIE0A);
-        sei();
+void abcRegisterSetup() {
+  ADMUX = 0;
+  ADMUX |= (1 << ADLAR);
+  ADMUX |= (1 << REFS0);
+  ADMUX |= (0 & 0x0F);
+
+  ADCSRA = 0;
+  ADCSRA |= (1 << ADEN);
+  ADCSRA |= (1 << ADATE);
+  ADCSRA |= (1 << ADIE); 
+  ADCSRA |= (1 << ADPS2); 
+  ADCSRA |= (1 << ADPS1);  
+  ADCSRA |= (1 << ADPS0);   
+  
+  ADCSRB = 0;
+  ADCSRA |= (1 << ADSC); 
 }
