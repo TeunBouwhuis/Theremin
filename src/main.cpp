@@ -4,7 +4,7 @@
 
 volatile uint8_t DRAAI_DING_WAARDE = 0;
 volatile uint8_t LEES_DATA = 0;
-
+// test bro
 void abcRegisterSetup() {
   ADMUX = 0;
   ADMUX |= (1 << ADLAR);
@@ -25,6 +25,11 @@ void abcRegisterSetup() {
 ISR(ADC_vect) {
     DRAAI_DING_WAARDE = ADCH;          // LEES DING
     LEES_DATA = 1;   // IS GELEZEN
+}
+
+void sensorSetup() {
+    DDRB &= ~(1 << DDB0); 
+    DDRB |= (1 << DDB1); 
 }
 
 int main(void) {
