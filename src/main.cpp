@@ -78,11 +78,60 @@ void filterRemove(FILTER_LIST* filter) {
     filter->size--;
 }
 
+int compareFilterItems(void* a, void* b) {
+    float valA = ((FILTER_ITEM*)a)->value;
+    float valB = ((FILTER_ITEM*)b)->value;
+    if (valA < valB) return -1;
+    if (valA > valB) return 1;
+    return 0;
+}
+
+float filterGetMedian(FILTER_LIST* filter) {
+    if (filter->size == 0) return 0.0;
+    FILTER_ITEM temp[filter->size];
+    for (uint8_t i = 0; i < filter->size; i++) {
+        temp[i] = filter->FILTER_ITEMS[i];
+    }
+    qsort(temp, filter->size, sizeof(FILTER_ITEM), compareFilterItems);
+    uint8_t mid = filter->size / 2;
+
+    float median = temp[mid].value;
+    return median;
+}
+
+void buttonsInit(void) {
+    // Set PD4 and PD5 as inputs
+    DDRD &= ~((1 << PD4) | (1 << PD5));
+
+    // Enable internal pull-ups
+    PORTD |= (1 << PD4) | (1 << PD5);
+
+    // Enable Pin Change Interrupt for PCINT[23:16] (Port D)
+    PCICR |= (1 << PCIE2);
+
+    // Enable PCINT20 (PD4) and PCINT21 (PD5)
+    PCMSK2 |= (1 << PCINT20) | (1 << PCINT21);
+}
+
+// ISR for PD4 / PD5 change
+ISR(PCINT2_vect) {
+    // Read pin states (inverted because of pull-ups)
+    uint8_t buttonState = PIND;
+
+    // If PD4 pressed → increase size
+    if (!(buttonState & (1 << PD4))) {
+        if (FILTER_SOFTMAX < FILTER_MAX) FILTER_SOFTMAX++;
+    }
+
+    // If PD5 pressed → decrease size
+    if (!(buttonState & (1 << PD5))) {
+        if (FILTER_SOFTMAX > FILTER_MIN) FILTER_SOFTMAX--;
+    }
+}
 
 void sensorRegisterSetup() {
     TCCR1A = 0x0;
-    TCCR1B = (1 << ICES1);
-    TCCR1B = (1 << CS11);  // 8
+    TCCR1B = (1 << ICES1) | (1 << CS11);
     TIMSK1 = (1 << ICIE1);
     TCNT1 = 0;
     TRIG_DDR |= (1 << TRIG_PIN); // output
@@ -106,6 +155,7 @@ void abcRegisterSetup() {
 }
 
 void registerSetup() {
+    buttonsInit();
     sensorRegisterSetup();
     abcRegisterSetup();
 }
@@ -126,8 +176,35 @@ void calculateDistance(uint16_t sensorTick) {
     DISTANCE = distance_cm;
 }
 
-void calculateFrequency(){
-    FREQUENCY = MAX_F  - ((MAX_F - MIN_F) * DISTANCE / 60 );
+void Filter_Print(FILTER_LIST* filter) {
+    if (filter == NULL || filter->FILTER_ITEMS == NULL) {
+        Serial.println("Filter not initialized.");
+        return;
+    }
+
+    Serial.println("---- FILTER CONTENTS ----");
+    Serial.print("Size: ");
+    Serial.println(filter->size);
+
+    for (uint8_t i = 0; i < filter->size; i++) {
+        Serial.print("[");
+        Serial.print(i);
+        Serial.print("] Age: ");
+        Serial.print(filter->FILTER_ITEMS[i].age);
+        Serial.print("  |  Value: ");
+        Serial.println(filter->FILTER_ITEMS[i].value, 2); // 2 decimal places
+    }
+    Serial.println(filterGetMedian(filter));
+    Serial.println("--------------------------");
+
+}
+
+float calculateFrequency(float distance_cm) {
+    if (distance_cm < 0) distance_cm = 0;
+    if (distance_cm > MAX_D) distance_cm = MAX_D;
+
+    float FREQUENCY = MAX_F - ((MAX_F - MIN_F) * distance_cm / MAX_D);
+    return FREQUENCY;
 }
 
 void sensorStateMachine() {
@@ -148,9 +225,13 @@ void sensorStateMachine() {
     case WAIT:
         if (captureFlag) {
             calculateDistance(ICR1);
-            calculateFrequency();
-            filterAdd(&filter, FREQUENCY);
-                        Serial.println(DISTANCE);
+            FREQUENCY = calculateFrequency(DISTANCE);
+            if (filter.size > FILTER_SOFTMAX) {
+                filterRemove(&filter);
+            } else {
+                filterAdd(&filter, FREQUENCY);
+
+            }
             captureFlag = false;
             sensor = START_PULSE;
         }
@@ -169,7 +250,6 @@ ISR(ADC_vect) {
 }
 
 ISR(TIMER1_CAPT_vect) {
-                Serial.println(DISTANCE);
     if (risingEdge) {
         TCNT1 = 0;
         TCCR1B &= ~(1 << ICES1);
@@ -194,6 +274,7 @@ int main(void) {
     while(1) {
         sensorStateMachine();
         if(LEES_DATA) {
+            Filter_Print(&filter);
             LEES_DATA = 0; // LEES OPNIEUW
 
         }
