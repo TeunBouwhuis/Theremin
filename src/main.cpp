@@ -5,7 +5,15 @@
 #define TRIG_PIN  PB1
 #define TRIG_DDR  DDRB
 #define TRIG_PORT PORTB
+#define FILTER_MAX 15
+#define FILTER_MIN 1
+#define MAX_F 1400
+#define MIN_F 230
+#define MAX_D 60
 
+volatile float DISTANCE;
+volatile float FREQUENCY = 300;
+volatile uint8_t FILTER_SOFTMAX = 5;
 
 volatile uint8_t DRAAI_DING_WAARDE = 0;
 volatile uint8_t LEES_DATA = 0;
@@ -15,7 +23,6 @@ volatile uint16_t ICR_VALUE = 0;
 volatile bool captureFlag = false;
 volatile bool risingEdge = true;
 
-
 typedef enum {
     START_PULSE,
     END_PULSE,
@@ -23,6 +30,53 @@ typedef enum {
 } SENSOR_STATE;
 
 SENSOR_STATE sensor = START_PULSE;
+
+typedef struct {
+    uint8_t age;
+    float value;
+} FILTER_ITEM;
+
+typedef struct {
+    FILTER_ITEM* FILTER_ITEMS;   // dynamically allocated array
+    uint8_t size;        // number of valid elements
+} FILTER_LIST;
+
+FILTER_LIST filter;
+
+void newFilter(FILTER_LIST* filter) {
+    filter->FILTER_ITEMS = (FILTER_ITEM*)malloc(FILTER_MAX * sizeof(FILTER_ITEM));
+    filter->size = 0;
+}
+
+void filterAdd(FILTER_LIST* filter, float newValue) {
+    uint8_t ageMaxxerIndex = 0;
+
+    for (uint8_t i = 0; i < filter->size; i++) { // VERHOOG AGE BIJ 1 VOOR ELKE ITEM
+        filter->FILTER_ITEMS[i].age++;
+        if (filter->FILTER_ITEMS[i].age > filter->FILTER_ITEMS[ageMaxxerIndex].age) {
+                ageMaxxerIndex = i;
+        }
+    }
+    if (filter->size >= FILTER_MAX || filter->size >= FILTER_SOFTMAX) {
+        filter->FILTER_ITEMS[ageMaxxerIndex].value = newValue;
+        filter->FILTER_ITEMS[ageMaxxerIndex].age = 0;
+    } else {
+        filter->FILTER_ITEMS[ filter->size].value = newValue;
+        filter->FILTER_ITEMS[ filter->size].age = 0;
+        filter->size++;
+    }
+}
+void filterRemove(FILTER_LIST* filter) {
+    uint8_t ageMaxxerIndex = 0;
+    for (uint8_t i = 0; i < filter->size; i++) { // VERHOOG AGE BIJ 1 VOOR ELKE ITEM
+        if (filter->FILTER_ITEMS[i].age > filter->FILTER_ITEMS[ageMaxxerIndex].age) {
+            ageMaxxerIndex = i;
+        }
+    }
+    filter->FILTER_ITEMS[ageMaxxerIndex].value = filter->FILTER_ITEMS[filter->size].value;
+    filter->FILTER_ITEMS[ageMaxxerIndex].age = filter->FILTER_ITEMS[filter->size].age;
+    filter->size--;
+}
 
 
 void sensorRegisterSetup() {
@@ -66,16 +120,14 @@ void setTriggerLow(void) {
     TRIG_PORT &= ~(1 << TRIG_PIN);
 }
 
-void triggerPulse(void) {
-    setTriggerHigh();
-    _delay_us(10); // 10 
-    setTriggerLow();
-}
-
-float calculateDistance(uint16_t sensorTick) {
+void calculateDistance(uint16_t sensorTick) {
     float time_us = (float)sensorTick * 0.5;
     float distance_cm = time_us / 58.0;
-    return distance_cm;
+    DISTANCE = distance_cm;
+}
+
+void calculateFrequency(){
+    FREQUENCY = MAX_F  - ((MAX_F - MIN_F) * DISTANCE / 60 );
 }
 
 void sensorStateMachine() {
@@ -95,7 +147,10 @@ void sensorStateMachine() {
     
     case WAIT:
         if (captureFlag) {
-            Serial.println(calculateDistance(ICR1));
+            calculateDistance(ICR1);
+            calculateFrequency();
+            filterAdd(&filter, FREQUENCY);
+                        Serial.println(DISTANCE);
             captureFlag = false;
             sensor = START_PULSE;
         }
@@ -114,6 +169,7 @@ ISR(ADC_vect) {
 }
 
 ISR(TIMER1_CAPT_vect) {
+                Serial.println(DISTANCE);
     if (risingEdge) {
         TCNT1 = 0;
         TCCR1B &= ~(1 << ICES1);
@@ -128,8 +184,10 @@ ISR(TIMER1_CAPT_vect) {
 
 
 int main(void) {
-    SENSOR_STATE sensor = START_PULSE;
+    setTriggerLow();
     registerSetup();
+    newFilter(&filter);
+
     Serial.begin(9600);
     sei();  // ZET INTERRUPTS AAN
     
@@ -137,7 +195,6 @@ int main(void) {
         sensorStateMachine();
         if(LEES_DATA) {
             LEES_DATA = 0; // LEES OPNIEUW
-            Serial.println(DRAAI_DING_WAARDE);
 
         }
     }
