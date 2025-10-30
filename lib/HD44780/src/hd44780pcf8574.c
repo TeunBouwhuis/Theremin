@@ -18,8 +18,7 @@
 #include <stdio.h>
 #include <util/delay.h>
 #include <avr/io.h>
-#include "twi.h"
-#include <hd44780pcf8574.h>
+#include "hd44780pcf8574.h"
 
 // +---------------------------+
 // |         Power on          |

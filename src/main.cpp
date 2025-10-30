@@ -1,7 +1,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <Arduino.h>
-#include <LiquidCrystal_I2C.h>
+#include "hd44780pcf8574.h"
+
 #define F_CPU 16000000UL
 
 #define TRIG_PIN  PB1
@@ -229,7 +230,6 @@ ISR(PCINT2_vect) {
 
 // =============== MAIN =================
 int main(void) {
-    Wire.begin();
     PORTC |= (1 << PC4) | (1 << PC5);
     registerSetup();
     newFilter(&filter);
