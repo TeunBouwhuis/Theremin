@@ -36,6 +36,10 @@ typedef struct {
 
 FILTER_LIST filter;
 
+#define LCD_ADDR 0x27  // your LCD’s I²C address
+
+
+
 // ================= FILTER =================
 void newFilter(FILTER_LIST *filter) {
   filter->FILTER_ITEMS = (FILTER_ITEM *)malloc(FILTER_MAX * sizeof(FILTER_ITEM));
@@ -235,6 +239,12 @@ int main(void) {
     newFilter(&filter);
     Serial.begin(9600);
     sei();
+     HD44780_PCF8574_Init(LCD_ADDR);
+    HD44780_PCF8574_DisplayOn(LCD_ADDR);
+    HD44780_PCF8574_PositionXY(LCD_ADDR, 0, 0);
+    HD44780_PCF8574_DrawString(LCD_ADDR, "Hello, world!");
+    HD44780_PCF8574_PositionXY(LCD_ADDR, 0, 1);
+    HD44780_PCF8574_DrawString(LCD_ADDR, "I2C LCD Ready");
     // lcd.init();
     // lcd.backlight();
     // lcd.clear();
