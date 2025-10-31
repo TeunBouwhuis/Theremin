@@ -18,7 +18,10 @@
 #include <stdio.h>
 #include <util/delay.h>
 #include <avr/io.h>
+<<<<<<< HEAD
 #include "twi.h"
+=======
+>>>>>>> c2a495f260dc34b84e5e7e95937f30d660302c82
 #include "hd44780pcf8574.h"
 
 // +---------------------------+
