@@ -36,11 +36,10 @@ typedef struct {
 
 FILTER_LIST filter;
 
-#define LCD_ADDR 0x27  // your LCD’s I²C address
+#define LCD_ADDR 0x27 
 
 
 
-// ================= FILTER =================
 void newFilter(FILTER_LIST *filter) {
   filter->FILTER_ITEMS = (FILTER_ITEM *)malloc(FILTER_MAX * sizeof(FILTER_ITEM));
   filter->size = 0;
@@ -77,7 +76,6 @@ float filterGetMedian(FILTER_LIST *filter) {
   return temp[filter->size / 2].value;
 }
 
-// =============== SENSOR ===================
 void calculateDistance(uint16_t sensorTick) {
   float time_us = (float)sensorTick * 0.5;
   DISTANCE = time_us / 58.0;
@@ -89,9 +87,7 @@ float calculateFrequency(float distance_cm) {
   return MAX_F - ((MAX_F - MIN_F) * distance_cm / MAX_D);
 }
 
-// =============== TIMERS ===================
 
-// Fast PWM on Timer2 = volume control (62.5 kHz)
 void pwmRegisterSetup(void) {
   DDRD |= (1 << PD3); // OC2B output
   TCCR2A = (1 << WGM21) | (1 << WGM20) | (1 << COM2B1); // Fast PWM, non-inverting
@@ -100,14 +96,12 @@ void pwmRegisterSetup(void) {
   TIMSK2 = 0;
 }
 
-// Timer0 = toggles PWM enable bit for tone frequency
 void buzzerRegisterSetup(void) {
   TCCR0A = (1 << WGM01); // CTC mode
   TCCR0B = (1 << CS02);  // prescaler 256 for 230–1400Hz range
   TIMSK0 = (1 << OCIE0A);
 }
 
-// ADC for potentiometer (volume)
 void abcRegisterSetup(void) {
   ADMUX = (1 << ADLAR) | (1 << REFS0);
   ADCSRA = (1 << ADEN) | (1 << ADATE) | (1 << ADIE)
@@ -116,7 +110,6 @@ void abcRegisterSetup(void) {
   ADCSRA |= (1 << ADSC);
 }
 
-// Ultrasonic echo capture
 void sensorRegisterSetup(void) {
   TCCR1A = 0;
   TCCR1B = (1 << ICES1) | (1 << CS11);
@@ -124,7 +117,6 @@ void sensorRegisterSetup(void) {
   DDRB |= (1 << TRIG_PIN);
 }
 
-// Buttons for filter size
 void buttonRegisterSetup(void) {
   DDRD &= ~((1 << PD4) | (1 << PD5));
   PORTD |= (1 << PD4) | (1 << PD5);
@@ -143,7 +135,6 @@ void registerSetup() {
 void setTriggerHigh(void) { TRIG_PORT |= (1 << TRIG_PIN); }
 void setTriggerLow(void)  { TRIG_PORT &= ~(1 << TRIG_PIN); }
 
-// === Frequency update (keeps timer stable) ===
 void set_frequency(uint16_t freq) {
   if (freq < MIN_F) freq = MIN_F;
   if (freq > MAX_F) freq = MAX_F;
@@ -155,10 +146,7 @@ void set_frequency(uint16_t freq) {
   TCNT0 = 0; // reset counter to avoid lag/stuck
 }
 
-//LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-
-// =============== STATE MACHINE ===============
 typedef enum {
   START_PULSE,
   END_PULSE,
@@ -188,9 +176,7 @@ void sensorStateMachine() {
   }
 }
 
-// =============== INTERRUPTS =================
 
-// Toggle PWM output enable (tone frequency)
 ISR(TIMER0_COMPA_vect) {
   static bool enabled = true;
   if (enabled) {
@@ -202,7 +188,6 @@ ISR(TIMER0_COMPA_vect) {
   }
 }
 
-// ADC interrupt – update volume
 ISR(ADC_vect) {
   uint8_t val = ADCH;
   if (val < 10) val = 10;
@@ -239,12 +224,12 @@ int main(void) {
     newFilter(&filter);
     Serial.begin(9600);
     sei();
-     HD44780_PCF8574_Init(LCD_ADDR);
-    HD44780_PCF8574_DisplayOn(LCD_ADDR);
-    HD44780_PCF8574_PositionXY(LCD_ADDR, 0, 0);
-    HD44780_PCF8574_DrawString(LCD_ADDR, "Hello, world!");
-    HD44780_PCF8574_PositionXY(LCD_ADDR, 0, 1);
-    HD44780_PCF8574_DrawString(LCD_ADDR, "I2C LCD Ready");
+    //  HD44780_PCF8574_Init(LCD_ADDR);
+    // HD44780_PCF8574_DisplayOn(LCD_ADDR);
+    // HD44780_PCF8574_PositionXY(LCD_ADDR, 0, 0);
+    // HD44780_PCF8574_DrawString(LCD_ADDR, "Hello, world!");
+    // HD44780_PCF8574_PositionXY(LCD_ADDR, 0, 1);
+    // HD44780_PCF8574_DrawString(LCD_ADDR, "I2C LCD Ready");
     // lcd.init();
     // lcd.backlight();
     // lcd.clear();
